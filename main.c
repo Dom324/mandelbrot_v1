@@ -5,11 +5,13 @@
 
 #include <complex.h>
 
-#include <png.h>
+#include <stdbool.h>
+
+#include <SDL.h>
 
 #define HEIGHT 1080
 #define WIDTH 1920
-#define NUM_ITERATIONS 80
+#define NUM_ITERATIONS 100
 
 #define RE_MIN -2
 #define RE_MAX 1.0
@@ -24,8 +26,6 @@ typedef struct pixel{
   unsigned char b;
 
 } pixel;
-
-void write_png_file(char* file_name, pixel color[WIDTH][HEIGHT]);
 
 double complex mandel(double complex c){
 
@@ -45,7 +45,7 @@ double complex mandel(double complex c){
 
 }
 
-int main() {
+void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double zoom){
 
   pixel palette[NUM_ITERATIONS];
 
@@ -55,100 +55,125 @@ int main() {
     palette[x].b = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 64.0));
   }
 
+  double x_min = (RE_MIN + creal(center)) * zoom;
+  double x_max = (RE_MAX + creal(center)) * zoom;
+  double y_min = (IM_MIN + cimag(center)) * zoom;
+  double y_max = (IM_MAX + cimag(center)) * zoom;
+
   static double complex arr[WIDTH][HEIGHT];
-  static pixel color[WIDTH][HEIGHT];
 
   for (size_t i = 0; i < WIDTH; i++) {
     for (size_t j = 0; j < HEIGHT; j++) {
 
-      double x =  (double)i / WIDTH;
-      double y =  (double)j / HEIGHT;
+      double x =  zoom * (double)i / WIDTH;
+      double y =  zoom * (double)j / HEIGHT;
 
-      arr[i][j] = RE_MIN + x * (RE_MAX - RE_MIN) + IM_MIN * I + y * (IM_MAX - IM_MIN) * I;
+      arr[i][j] = x_min + x * (x_max - x_min) + y_min * I + y * (y_max - y_min) * I;
 
-      /*printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
-           creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));*/
+      //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
+      //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
 
       arr[i][j] = mandel(arr[i][j]);
 
-      /*printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
-           creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));*/
+      //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
+      //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
 
-      color[i][j].r = (unsigned char)255 - (unsigned char)(cabs(arr[i][j]) * 255.0 / NUM_ITERATIONS);
+      color[j][i].r = (unsigned char)255 - (unsigned char)(cabs(arr[i][j]) * 255.0 / NUM_ITERATIONS);
       //printf("%d \n",color[i][j].r);
-      color[i][j].b = palette[(int)cabs(arr[i][j])].b;
-      color[i][j].g = palette[(int)(arr[i][j])].g;
+      color[j][i].b = palette[(int)cabs(arr[i][j])].b;
+      color[j][i].g = palette[(int)cabs(arr[i][j])].g;
 
     }
   }
 
-  write_png_file("output2.png", color);
-
-  return 0;
 }
 
+int main() {
 
-void write_png_file(char* file_name, pixel color[WIDTH][HEIGHT])
-{
+  SDL_Init(SDL_INIT_VIDEO);
+  SDL_Window * window = SDL_CreateWindow("SDL2 Displaying Image",
+      SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1920, 1080, 0);
 
-        FILE *fp = fopen(file_name, "wb");
-        if (!fp) exit(-1);
+  if(window == NULL){
+    printf("%s", SDL_GetError());
+    return 0;
+  }
 
-        png_structp png_ptr;
-        png_infop info_ptr;
-        png_bytep * row_pointers;
+  SDL_Renderer * renderer = SDL_CreateRenderer(window, -1, 0);
+  SDL_Surface * image = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 32, SDL_PIXELFORMAT_RGBA32);
+  SDL_Texture * texture;
 
-        /* initialize stuff */
-        png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-        if (!png_ptr) exit(-1);
+  bool quit = false;
+  bool update = true;
+  double zoom = 1.0;
+  double complex center = 0;
+  SDL_Event event;
 
-        info_ptr = png_create_info_struct(png_ptr);
-        if (info_ptr == NULL) exit(-1);
+  while (!quit)
+  {
 
-        if (setjmp(png_jmpbuf(png_ptr))) exit(-1);
+    if(update){
+      static pixel color[HEIGHT][WIDTH];
 
-        png_init_io(png_ptr, fp);
+      calculate_frame(color, center, zoom);
 
-        if (setjmp(png_jmpbuf(png_ptr))) exit(-1);
+      SDL_ConvertPixels(WIDTH, HEIGHT, SDL_PIXELFORMAT_RGB24, color, WIDTH * 3, SDL_PIXELFORMAT_RGBA32, image->pixels, image->pitch);
+      texture = SDL_CreateTextureFromSurface(renderer, image);
 
-        png_set_IHDR(png_ptr, info_ptr, WIDTH, HEIGHT,
-                     8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE,
-                     PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+      SDL_RenderCopy(renderer, texture, NULL, NULL);
+      SDL_RenderPresent(renderer);
 
-        png_write_info(png_ptr, info_ptr);
+      update = false;
+    }
 
-        row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * HEIGHT);
+    SDL_WaitEvent(&event);
 
-        if(row_pointers == NULL) exit(-1);
+    switch (event.type){
 
-        for (int y=0; y < HEIGHT; y++){
-            row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(png_ptr,info_ptr));
+      case SDL_QUIT:
+        quit = true;
+      break;
+
+      case SDL_KEYDOWN:
+
+        if(event.key.keysym.sym == SDLK_q){
+          quit = 1;
         }
-
-        for (int y=0; y < HEIGHT; y++) {
-
-          png_byte* row = row_pointers[y];
-
-          for (int x=0; x < WIDTH; x++) {
-
-                  png_byte* ptr = &(row[x*4]);
-                  /*printf("Pixel at position [ %d - %d ] has RGBA values: %d - %d - %d - %d\n",
-                        x, y, ptr[0], ptr[1], ptr[2], ptr[3]);*/
-
-                  /* set red value to 0 and green value to the blue one */
-                  ptr[0] = color[x][y].r;
-                  ptr[1] = color[x][y].g;
-                  ptr[2] = color[x][y].b;
-                  ptr[3] = 255;
-          }
+        else if(event.key.keysym.sym == SDLK_UP){
+          center = center - 0.1 * zoom * I;
+          update = 1;
         }
+        else if(event.key.keysym.sym == SDLK_DOWN){
+          center = center + 0.1 * zoom * I;
+          update = 1;
+        }
+        else if(event.key.keysym.sym == SDLK_RIGHT){
+          center = center + 0.1 * zoom;
+          update = 1;
+        }
+        else if(event.key.keysym.sym == SDLK_LEFT){
+          center = center - 0.1 * zoom;
+          update = 1;
+        }
+        else if(event.key.keysym.sym == SDLK_KP_PLUS){
+          zoom = zoom - 0.2 * zoom;
+          update = 1;
+        }
+        else if(event.key.keysym.sym == SDLK_KP_MINUS){
+          zoom = zoom + 0.2 * zoom;
+          update = 1;
+        }
+      break;
 
-        png_write_image(png_ptr, row_pointers);
-        png_write_end(png_ptr, NULL);
+      }
+  }
 
-        /* cleanup heap allocation */
-        for (int y=0; y < HEIGHT; y++) free(row_pointers[y]);
+  SDL_DestroyTexture(texture);
+  SDL_FreeSurface(image);
+  SDL_DestroyRenderer(renderer);
+  SDL_DestroyWindow(window);
 
-        free(row_pointers);
-        fclose(fp);
+  SDL_Quit();
+
+  return 0;
 }
