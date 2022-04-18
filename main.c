@@ -11,7 +11,7 @@
 
 #define HEIGHT 1080
 #define WIDTH 1920
-#define NUM_ITERATIONS 100
+#define NUM_ITERATIONS 150
 
 #define RE_MIN -2
 #define RE_MAX 1.0
@@ -27,17 +27,43 @@ typedef struct pixel{
 
 } pixel;
 
-double complex mandel(double complex c){
+__m256d mult(__m256d a, __m256d b){
 
-  double complex z = 0;
+  __m256d bSwap = _mm256_shuffle_pd(b, b, 5);
 
-  for(int p = 0; p < NUM_ITERATIONS; ++p){
+  __m256d aIm = _mm256_shuffle_pd(a, a, 15);
 
-    z = (z * z) + c;
+  __m256d aRe = _mm256_shuffle_pd(a, a, 0);
+
+  __m256d aIm_bSwap = _mm256_mul_pd(aIm, bSwap);
+
+  return _mm256_fmaddsub_pd(aRe, b, aIm_bSwap);
+
+}
+
+union fuckThis{
+  __m256d vec;
+  double arr[4];
+};
+
+int mandel(double complex c){
+
+  union fuckThis vecC, vecZ;
+  vecC.vec = _mm256_set_pd(0.0, 0.0, cimag(c), creal(c));
+  vecZ.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+  //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
+
+  //double complex z = 0;
+
+  for(int p = 0; p < NUM_ITERATIONS; p++){
+
+    //z = (z * z) + c;
     /*printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
          creal(z), cimag(z), cabs(z), carg(z));*/
+    //if(cabs(z) > 2) return p;
 
-    if(cabs(z) > 2) return p;
+    vecZ.vec = _mm256_add_pd(vecC.vec, mult(vecZ.vec, vecZ.vec));
+    if(sqrt(vecZ.arr[0] * vecZ.arr[1]) > 2.0) return p;
 
   }
 
@@ -62,8 +88,8 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double z
 
   static double complex arr[WIDTH][HEIGHT];
 
-  for (size_t i = 0; i < WIDTH; i++) {
-    for (size_t j = 0; j < HEIGHT; j++) {
+  for (size_t j = 0; j < HEIGHT; j++) {
+    for (size_t i = 0; i < WIDTH; i++) {
 
       double x =  zoom * (double)i / WIDTH;
       double y =  zoom * (double)j / HEIGHT;
@@ -73,15 +99,15 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double z
       //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
       //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
 
-      arr[i][j] = mandel(arr[i][j]);
+      int res = mandel(arr[i][j]);
 
       //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
       //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
 
-      color[j][i].r = (unsigned char)255 - (unsigned char)(cabs(arr[i][j]) * 255.0 / NUM_ITERATIONS);
+      color[j][i].r = (unsigned char)(res * 255.0 / NUM_ITERATIONS);
       //printf("%d \n",color[i][j].r);
-      color[j][i].b = palette[(int)cabs(arr[i][j])].b;
-      color[j][i].g = palette[(int)cabs(arr[i][j])].g;
+      color[j][i].b = (unsigned char)(res * 255.0 / NUM_ITERATIONS);
+      color[j][i].g = (unsigned char)(res * 255.0 / NUM_ITERATIONS);
 
     }
   }
@@ -109,6 +135,9 @@ int main() {
   double complex center = 0;
   SDL_Event event;
 
+  SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
+  int i = 0;
+
   while (!quit)
   {
 
@@ -126,9 +155,13 @@ int main() {
       update = false;
     }
 
-    SDL_WaitEvent(&event);
+    //SDL_WaitEvent(&event);
 
-    switch (event.type){
+    event.key.keysym.sym = commands[i];
+    i++;
+
+    //switch (event.type){
+    switch (SDL_KEYDOWN){
 
       case SDL_QUIT:
         quit = true;
@@ -166,6 +199,7 @@ int main() {
       break;
 
       }
+
   }
 
   SDL_DestroyTexture(texture);
