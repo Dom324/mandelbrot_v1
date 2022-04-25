@@ -3,9 +3,8 @@
 #include <stdio.h>
 #include <math.h>
 
-#include <SDL.h>
-
-#include <cpuid.h>
+#include <SDL.h>      //Library to render a window
+#include <cpuid.h>    //Identify AVX2 support
 
 #define HEIGHT 1080
 #define WIDTH 1920
@@ -17,6 +16,7 @@
 #define IM_MIN -1
 #define IM_MAX 1.0
 
+//Function to determine AVX2 support
 static inline int is_avx2_supported(){
 
   unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
@@ -141,13 +141,13 @@ int main() {
   SDL_Renderer * renderer = SDL_CreateRenderer(window, -1, 0);
   SDL_Surface * image = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 32, SDL_PIXELFORMAT_RGBA32);
   SDL_Texture * texture;
-
+  SDL_Event event;
   int quit = 0;
   int update = 1;
+  
   double zoom = 1.0;
   double centerX = 0;
   double centerY = 0;
-  SDL_Event event;
 
   SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
   int i = 0;
