@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <math.h>
 
-#include <stdbool.h>
-
 #include <SDL.h>
 
 #include <cpuid.h>
@@ -144,8 +142,8 @@ int main() {
   SDL_Surface * image = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 32, SDL_PIXELFORMAT_RGBA32);
   SDL_Texture * texture;
 
-  bool quit = false;
-  bool update = true;
+  int quit = 0;
+  int update = 1;
   double zoom = 1.0;
   double centerX = 0;
   double centerY = 0;
@@ -168,7 +166,7 @@ int main() {
       SDL_RenderCopy(renderer, texture, NULL, NULL);
       SDL_RenderPresent(renderer);
 
-      update = false;
+      update = 0;
     }
 
     //SDL_WaitEvent(&event);
@@ -180,7 +178,7 @@ int main() {
     switch (SDL_KEYDOWN){
 
       case SDL_QUIT:
-        quit = true;
+        quit = 1;
       break;
 
       case SDL_KEYDOWN:
