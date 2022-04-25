@@ -68,13 +68,15 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
   //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
 
   union four_ints res;
-  res.vec = _mm256_set_epi64x(NUM_ITERATIONS, NUM_ITERATIONS, NUM_ITERATIONS, NUM_ITERATIONS);
+  res.vec = _mm256_set_epi64x(0.0, 0.0, 0.0, 0.0);
   __m256i iterator = _mm256_set_epi64x(0, 0, 0, 0);
 
   __m256d Zre2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   __m256d Zim2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
 
-  for(int p = 0; p < NUM_ITERATIONS; p++){
+  __m256d two = _mm256_set_pd(2.0, 2.0, 2.0, 2.0);
+
+  for(int p = 1; p <= NUM_ITERATIONS; p++){
 
     __m256d twoX = _mm256_add_pd(Zre.vec, Zre.vec);
     Zim.vec = _mm256_mul_pd(Zim.vec, twoX);
@@ -86,19 +88,18 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
     Zre2 = _mm256_mul_pd(Zre.vec, Zre.vec);
     Zim2 = _mm256_mul_pd(Zim.vec, Zim.vec);
 
-    union four_doubles abs;
-    abs.vec = _mm256_add_pd(Zre2, Zim2);
-    abs.vec = _mm256_sqrt_pd(abs.vec);
+    __m256d abs = _mm256_add_pd(Zre2, Zim2);
+    abs = _mm256_sqrt_pd(abs);
 
-    res.arr[0] = (abs.arr[0] < 2.0) ? p : res.arr[0];
-    res.arr[1] = (abs.arr[1] < 2.0) ? p : res.arr[1];
-    res.arr[2] = (abs.arr[2] < 2.0) ? p : res.arr[2];
-    res.arr[3] = (abs.arr[3] < 2.0) ? p : res.arr[3];
+    union four_ints mask;
+    mask.vec = (__m256i)_mm256_cmp_pd(abs, two, _CMP_LT_OQ);
 
-    /*if( sqrt(vecZ.arr[0] * vecZ.arr[0] + vecZ.arr[1] * vecZ.arr[1]) > 2.0){
-      res = _mm256_set_epi64x(p, p, p, p);
-      return res;
-    }*/
+    res.arr[0] = mask.arr[0] ? p : res.arr[0];
+    res.arr[1] = mask.arr[1] ? p : res.arr[1];
+    res.arr[2] = mask.arr[2] ? p : res.arr[2];
+    res.arr[3] = mask.arr[3] ? p : res.arr[3];
+
+    if( ( mask.arr[0] | mask.arr[1] | mask.arr[2] | mask.arr[3] ) == 0 ) break;
 
   }
 
@@ -133,7 +134,7 @@ __m256i mandel(union four_doubles cre, union four_doubles cim, int is_avx2){
 
   union four_ints res;
 
-  if(is_avx2){
+  if(1){
     //AVX2 instrukce jsou podporovany, rychla cesta
 
     res.vec = vec_mandel(cre.vec, cim.vec);
