@@ -8,7 +8,7 @@
 
 #define HEIGHT 1080
 #define WIDTH 1920
-#define NUM_ITERATIONS 255
+#define NUM_ITERATIONS 100
 
 #define RE_MIN -2
 #define RE_MAX 1.0
@@ -210,10 +210,14 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
       res.vec = mandel(cre, cim, is_avx2);
 
       for(int ii = 0; ii < 4; ii++){
-        color[i][j + ii].r = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
+
+        double range = (double)res.arr[ii] / NUM_ITERATIONS;
+        int index = 255 - (unsigned char)(range * 255.0);
+
+        color[i][j + ii].r = index;
         //color[i][j + ii].r = palette[res.arr[ii]].r;
-        color[i][j + ii].b = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
-        color[i][j + ii].g = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[i][j + ii].b = index;
+        color[i][j + ii].g = index;
       }
       //printf("%d \n",color[i][j].r);
 
