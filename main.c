@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <math.h>
 
-#include <complex.h>
-
 #include <stdbool.h>
 
 #include <SDL.h>
@@ -59,10 +57,10 @@ union fuckThis{
   double arr[4];
 };
 
-int mandel(double complex c, int is_avx2){
+int mandel(double re, double im, int is_avx2){
 
   union fuckThis vecC, vecZ;
-  vecC.vec = _mm256_set_pd(0.0, 0.0, cimag(c), creal(c));
+  vecC.vec = _mm256_set_pd(0.0, 0.0, im, re);
   vecZ.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
 
@@ -84,7 +82,7 @@ int mandel(double complex c, int is_avx2){
 
 }
 
-void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double zoom, int is_avx2){
+void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY, double zoom, int is_avx2){
 
   /*pixel palette[NUM_ITERATIONS];
 
@@ -94,12 +92,13 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double z
     palette[x].b = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 64.0));
   }*/
 
-  double x_min = (RE_MIN + creal(center)) * zoom;
-  double x_max = (RE_MAX + creal(center)) * zoom;
-  double y_min = (IM_MIN + cimag(center)) * zoom;
-  double y_max = (IM_MAX + cimag(center)) * zoom;
+  double x_min = (RE_MIN + centerX) * zoom;
+  double x_max = (RE_MAX + centerX) * zoom;
+  double y_min = (IM_MIN + centerY) * zoom;
+  double y_max = (IM_MAX + centerY) * zoom;
 
-  static double complex arr[WIDTH][HEIGHT];
+  static double arr_re[WIDTH][HEIGHT];
+  static double arr_im[WIDTH][HEIGHT];
 
   for (size_t j = 0; j < HEIGHT; j++) {
     for (size_t i = 0; i < WIDTH; i++) {
@@ -107,12 +106,13 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double z
       double x =  zoom * (double)i / WIDTH;
       double y =  zoom * (double)j / HEIGHT;
 
-      arr[i][j] = x_min + x * (x_max - x_min) + y_min * I + y * (y_max - y_min) * I;
+      arr_re[i][j] = x_min + x * (x_max - x_min);
+      arr_im[i][j] = y_min + y * (y_max - y_min);
 
       //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
       //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
 
-      int res = mandel(arr[i][j], is_avx2);
+      int res = mandel(arr_re[i][j], arr_im[i][j], is_avx2);
 
       //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
       //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
@@ -147,7 +147,8 @@ int main() {
   bool quit = false;
   bool update = true;
   double zoom = 1.0;
-  double complex center = 0;
+  double centerX = 0;
+  double centerY = 0;
   SDL_Event event;
 
   SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
@@ -159,7 +160,7 @@ int main() {
     if(update){
       static pixel color[HEIGHT][WIDTH];
 
-      calculate_frame(color, center, zoom, is_avx2);
+      calculate_frame(color, centerX, centerY, zoom, is_avx2);
 
       SDL_ConvertPixels(WIDTH, HEIGHT, SDL_PIXELFORMAT_RGB24, color, WIDTH * 3, SDL_PIXELFORMAT_RGBA32, image->pixels, image->pitch);
       texture = SDL_CreateTextureFromSurface(renderer, image);
@@ -188,19 +189,19 @@ int main() {
           quit = 1;
         }
         else if(event.key.keysym.sym == SDLK_UP){
-          center = center - 0.1 * zoom * I;
+          centerY = centerY - 0.1 * zoom;
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_DOWN){
-          center = center + 0.1 * zoom * I;
+          centerY = centerY + 0.1 * zoom;
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_RIGHT){
-          center = center + 0.1 * zoom;
+          centerX = centerX + 0.1 * zoom;
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_LEFT){
-          center = center - 0.1 * zoom;
+          centerX = centerX - 0.1 * zoom;
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_KP_PLUS){
