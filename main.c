@@ -60,35 +60,49 @@ union four_ints{
   long long arr[4];
 };
 
-__m256i vec_mandel(double cre, double cim){
+__m256i vec_mandel(__m256d cre, __m256d cim){
 
-  union four_doubles vecC, vecZ;
-  vecC.vec = _mm256_set_pd(0.0, 0.0, cim, cre);
-  vecZ.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+  union four_doubles Zre, Zim;
+  Zre.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+  Zim.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
 
-  __m256i res = _mm256_set_epi64x(NUM_ITERATIONS, NUM_ITERATIONS, NUM_ITERATIONS, NUM_ITERATIONS);
+  union four_ints res;
+  res.vec = _mm256_set_epi64x(NUM_ITERATIONS, NUM_ITERATIONS, NUM_ITERATIONS, NUM_ITERATIONS);
+  __m256i iterator = _mm256_set_epi64x(0, 0, 0, 0);
+
+  __m256d Zre2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+  __m256d Zim2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
 
   for(int p = 0; p < NUM_ITERATIONS; p++){
 
-    //z = (z * z) + c;
-    /*printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
-         creal(z), cimag(z), cabs(z), carg(z));*/
-    //if(cabs(z) > 2) return p;
+    __m256d twoX = _mm256_add_pd(Zre.vec, Zre.vec);
+    Zim.vec = _mm256_mul_pd(Zim.vec, twoX);
+    Zim.vec = _mm256_add_pd(Zim.vec, cim);
 
-    vecZ.vec = _mm256_add_pd(vecC.vec, mult(vecZ.vec, vecZ.vec));
+    Zre.vec = _mm256_sub_pd(Zre2, Zim2);
+    Zre.vec = _mm256_add_pd(Zre.vec, cre);
 
-    /*printf("%d c in %lf %lfi out %lf %lfi\n", p, vecZ.arr[0], vecZ.arr[1], vecZ.arr[2], vecZ.arr[3]);
-          getchar();*/
+    Zre2 = _mm256_mul_pd(Zre.vec, Zre.vec);
+    Zim2 = _mm256_mul_pd(Zim.vec, Zim.vec);
 
-    if( sqrt(vecZ.arr[0] * vecZ.arr[0] + vecZ.arr[1] * vecZ.arr[1]) > 2.0){
+    union four_doubles abs;
+    abs.vec = _mm256_add_pd(Zre2, Zim2);
+    abs.vec = _mm256_sqrt_pd(abs.vec);
+
+    res.arr[0] = (abs.arr[0] < 2.0) ? p : res.arr[0];
+    res.arr[1] = (abs.arr[1] < 2.0) ? p : res.arr[1];
+    res.arr[2] = (abs.arr[2] < 2.0) ? p : res.arr[2];
+    res.arr[3] = (abs.arr[3] < 2.0) ? p : res.arr[3];
+
+    /*if( sqrt(vecZ.arr[0] * vecZ.arr[0] + vecZ.arr[1] * vecZ.arr[1]) > 2.0){
       res = _mm256_set_epi64x(p, p, p, p);
       return res;
-    }
+    }*/
 
   }
 
-  return res;
+  return res.vec;
 
 }
 
@@ -119,15 +133,15 @@ __m256i mandel(union four_doubles cre, union four_doubles cim, int is_avx2){
 
   union four_ints res;
 
-  /*if(is_avx2){
+  if(is_avx2){
     //AVX2 instrukce jsou podporovany, rychla cesta
 
-    res.vec = vec_mandel(cre, cim);
+    res.vec = vec_mandel(cre.vec, cim.vec);
 
     return res.vec;
 
   }
-  else{*/
+  else{
 
     //AVX2 instrukce nejsou podporovany, pomala cesta
     res.arr[0] = scalar_mandel(cre.arr[0], cim.arr[0]);
@@ -137,7 +151,7 @@ __m256i mandel(union four_doubles cre, union four_doubles cim, int is_avx2){
 
     return res.vec;
 
-  //}
+  }
 
 }
 
