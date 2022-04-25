@@ -50,33 +50,84 @@ __m256d mult(__m256d a, __m256d b){
 
 }
 
-union fuckThis{
+union four_doubles{
   __m256d vec;
   double arr[4];
 };
 
-int mandel(double re, double im, int is_avx2){
+union four_ints{
+  __m256i vec;
+  long long arr[4];
+};
 
-  union fuckThis vecC, vecZ;
-  vecC.vec = _mm256_set_pd(0.0, 0.0, im, re);
+
+
+__m256i mandel(double cre, double cim, int is_avx2){
+
+  union four_doubles vecC, vecZ;
+  vecC.vec = _mm256_set_pd(0.0, 0.0, cim, cre);
   vecZ.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
 
-  //double complex z = 0;
+  union four_ints res;
+  res.vec = _mm256_set_epi64x(NUM_ITERATIONS, NUM_ITERATIONS, NUM_ITERATIONS, NUM_ITERATIONS);
 
-  for(int p = 0; p < NUM_ITERATIONS; p++){
+  if(0){
+    //AVX2 instrukce jsou podporovany, rychla cesta
 
-    //z = (z * z) + c;
-    /*printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
-         creal(z), cimag(z), cabs(z), carg(z));*/
-    //if(cabs(z) > 2) return p;
+    for(int p = 0; p < NUM_ITERATIONS; p++){
 
-    vecZ.vec = _mm256_add_pd(vecC.vec, mult(vecZ.vec, vecZ.vec));
-    if( sqrt(vecZ.arr[0] * vecZ.arr[1]) > 2.0) return p;
+      //z = (z * z) + c;
+      /*printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
+           creal(z), cimag(z), cabs(z), carg(z));*/
+      //if(cabs(z) > 2) return p;
+
+      vecZ.vec = _mm256_add_pd(vecC.vec, mult(vecZ.vec, vecZ.vec));
+
+      /*printf("%d c in %lf %lfi out %lf %lfi\n", p, vecZ.arr[0], vecZ.arr[1], vecZ.arr[2], vecZ.arr[3]);
+            getchar();*/
+
+      if( sqrt(vecZ.arr[0] * vecZ.arr[0] + vecZ.arr[1] * vecZ.arr[1]) > 2.0){
+        res.vec = _mm256_set_epi64x(p, p, p, p);
+        return res.vec;
+      }
+
+    }
+
+    return res.vec;
+
+  }
+  else{
+
+    //AVX2 instrukce nejsou podporovany, pomala cesta
+    for(int pixel = 0; pixel < 4; pixel++){
+
+      double zre = 0.0;
+      double zim = 0.0;
+
+      for(int p = 0; p < NUM_ITERATIONS; p++){
+
+        //z = (z * z) + c;
+        double zre_temp = (zre * zre - zim * zim) + cre;
+        zim = (2 * zre * zim) + cim;
+        zre = zre_temp;
+
+        /*printf("%d %.1f%+.1fi\n",p, zre, zim);
+        getchar();*/
+
+        if(sqrt(zre * zre + zim * zim) > 2.0){
+          res.arr[pixel] = p;
+          break;
+        }
+
+      }
+    }
+
+    return res.vec;
 
   }
 
-  return NUM_ITERATIONS;
+
 
 }
 
@@ -107,18 +158,15 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
       arr_re[i][j] = x_min + x * (x_max - x_min);
       arr_im[i][j] = y_min + y * (y_max - y_min);
 
-      //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
-      //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
+      union four_ints res;
+      res.vec = mandel(arr_re[i][j], arr_im[i][j], is_avx2);
 
-      int res = mandel(arr_re[i][j], arr_im[i][j], is_avx2);
-
-      //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
-      //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
-
-      color[j][i].r = (unsigned char)(res * 255.0 / NUM_ITERATIONS);
+      for(int ii = 0; ii < 4; ii++){
+        color[j][i].r = (unsigned char)(res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[j][i].b = (unsigned char)(res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[j][i].g = (unsigned char)(res.arr[ii] * 255.0 / NUM_ITERATIONS);
+      }
       //printf("%d \n",color[i][j].r);
-      color[j][i].b = (unsigned char)(res * 255.0 / NUM_ITERATIONS);
-      color[j][i].g = (unsigned char)(res * 255.0 / NUM_ITERATIONS);
 
     }
   }
@@ -144,7 +192,7 @@ int main() {
   SDL_Event event;
   int quit = 0;
   int update = 1;
-  
+
   double zoom = 1.0;
   double centerX = 0;
   double centerY = 0;
