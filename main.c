@@ -184,9 +184,9 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
       res.vec = mandel(cre, cim, is_avx2);
 
       for(int ii = 0; ii < 4; ii++){
-        color[i][j].r = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
-        color[i][j].b = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
-        color[i][j].g = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[i][j + ii].r = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[i][j + ii].b = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[i][j + ii].g = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
       }
       //printf("%d \n",color[i][j].r);
 
