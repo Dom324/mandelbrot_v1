@@ -115,11 +115,11 @@ long long scalar_mandel(double cre, double cim){
 
 }
 
-__m256i mandel(double cre, double cim, int is_avx2){
+__m256i mandel(union four_doubles cre, union four_doubles cim, int is_avx2){
 
   union four_ints res;
 
-  if(is_avx2){
+  /*if(is_avx2){
     //AVX2 instrukce jsou podporovany, rychla cesta
 
     res.vec = vec_mandel(cre, cim);
@@ -127,18 +127,17 @@ __m256i mandel(double cre, double cim, int is_avx2){
     return res.vec;
 
   }
-  else{
+  else{*/
 
     //AVX2 instrukce nejsou podporovany, pomala cesta
-    union four_ints res;
-    res.arr[0] = scalar_mandel(cre, cim);
-    res.arr[1] = scalar_mandel(cre, cim);
-    res.arr[2] = scalar_mandel(cre, cim);
-    res.arr[3] = scalar_mandel(cre, cim);
+    res.arr[0] = scalar_mandel(cre.arr[0], cim.arr[0]);
+    res.arr[1] = scalar_mandel(cre.arr[1], cim.arr[1]);
+    res.arr[2] = scalar_mandel(cre.arr[2], cim.arr[2]);
+    res.arr[3] = scalar_mandel(cre.arr[3], cim.arr[3]);
 
     return res.vec;
 
-  }
+  //}
 
 }
 
@@ -157,25 +156,37 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
   double y_min = (IM_MIN + centerY) * zoom;
   double y_max = (IM_MAX + centerY) * zoom;
 
-  static double arr_re[WIDTH][HEIGHT];
-  static double arr_im[WIDTH][HEIGHT];
+  static double arr_re[HEIGHT][WIDTH];
+  static double arr_im[HEIGHT][WIDTH];
 
-  for (size_t j = 0; j < HEIGHT; j++) {
-    for (size_t i = 0; i < WIDTH; i++) {
+  //vypocet souradnic pixelu
+  for (size_t i = 0; i < HEIGHT; i++){
+    for (size_t j = 0; j < WIDTH; j++){
 
-      double x =  zoom * (double)i / WIDTH;
-      double y =  zoom * (double)j / HEIGHT;
+      double y =  zoom * (double)i / HEIGHT;
+      double x =  zoom * (double)j / WIDTH;
 
       arr_re[i][j] = x_min + x * (x_max - x_min);
       arr_im[i][j] = y_min + y * (y_max - y_min);
 
+    }
+  }
+
+  //vypocet iteraci pro jednotlive pixely
+  for (size_t i = 0; i < HEIGHT; i++){
+    for (size_t j = 0; j < WIDTH; j = j + 4){
+
       union four_ints res;
-      res.vec = mandel(arr_re[i][j], arr_im[i][j], is_avx2);
+      union four_doubles cre, cim;
+      cre.vec = _mm256_set_pd(arr_re[i][j + 3], arr_re[i][j + 2], arr_re[i][j + 1], arr_re[i][j]);
+      cim.vec = _mm256_set_pd(arr_im[i][j + 3], arr_im[i][j + 2], arr_im[i][j + 1], arr_im[i][j]);
+
+      res.vec = mandel(cre, cim, is_avx2);
 
       for(int ii = 0; ii < 4; ii++){
-        color[j][i].r = (unsigned char)(res.arr[ii] * 255.0 / NUM_ITERATIONS);
-        color[j][i].b = (unsigned char)(res.arr[ii] * 255.0 / NUM_ITERATIONS);
-        color[j][i].g = (unsigned char)(res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[i][j].r = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[i][j].b = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        color[i][j].g = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
       }
       //printf("%d \n",color[i][j].r);
 
