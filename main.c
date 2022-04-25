@@ -8,7 +8,7 @@
 
 #define HEIGHT 1080
 #define WIDTH 1920
-#define NUM_ITERATIONS 100
+#define NUM_ITERATIONS_MAX 120
 
 #define RE_MIN -2
 #define RE_MAX 1.0
@@ -19,13 +19,16 @@
 //Function to determine AVX2 support
 static unsigned int is_avx2_supported(){
 
-  unsigned int eax, ebx, ecx, edx;
+  //unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
+  //__get_cpuid(7, &eax, &ebx, &ecx, &edx);
 
-  __get_cpuid(7, &eax, &ebx, &ecx, &edx);
+  uint32_t regs[4];
 
-  //printf("ebx %d %x\n", ebx, ebx);
+  asm volatile(
+    "cpuid" : "=a" (regs[0]), "=b" (regs[1]), "=c" (regs[2]), "=d" (regs[3]) : "a" (7), "c" (0)
+     );
 
-  return ((ebx & bit_AVX2) ? 1 : 0);
+  return ((regs[1] & bit_AVX2) ? 1 : 0);
 
 }
 
@@ -36,20 +39,6 @@ typedef struct pixel{
   unsigned char b;
 
 } pixel;
-
-__m256d mult(__m256d a, __m256d b){
-
-  __m256d bSwap = _mm256_shuffle_pd(b, b, 5);
-
-  __m256d aIm = _mm256_shuffle_pd(a, a, 15);
-
-  __m256d aRe = _mm256_shuffle_pd(a, a, 0);
-
-  __m256d aIm_bSwap = _mm256_mul_pd(aIm, bSwap);
-
-  return _mm256_fmaddsub_pd(aRe, b, aIm_bSwap);
-
-}
 
 union four_doubles{
   __m256d vec;
@@ -70,14 +59,14 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
 
   union four_ints res;
   res.vec = _mm256_set_epi64x(0.0, 0.0, 0.0, 0.0);
-  __m256i iterator = _mm256_set_epi64x(0, 0, 0, 0);
+  //__m256i iterator = _mm256_set_epi64x(0, 0, 0, 0);
 
   __m256d Zre2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   __m256d Zim2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
 
   __m256d two = _mm256_set_pd(2.0, 2.0, 2.0, 2.0);
 
-  for(int p = 1; p <= NUM_ITERATIONS; p++){
+  for(int p = 1; p <= NUM_ITERATIONS_MAX; p++){
 
     __m256d twoX = _mm256_add_pd(Zre.vec, Zre.vec);
     Zim.vec = _mm256_mul_pd(Zim.vec, twoX);
@@ -113,58 +102,66 @@ long long scalar_mandel(double cre, double cim){
   double zre = 0.0;
   double zim = 0.0;
 
-  for(int p = 0; p < NUM_ITERATIONS; p++){
+  for(int p = 0; p < NUM_ITERATIONS_MAX; p++){
 
     //z = (z * z) + c;
     double zre_temp = (zre * zre - zim * zim) + cre;
     zim = (2 * zre * zim) + cim;
     zre = zre_temp;
 
-    /*printf("%d %.1f%+.1fi\n",p, zre, zim);
-    getchar();*/
-
     if(sqrt(zre * zre + zim * zim) > 2.0) return p;
 
   }
 
-  return NUM_ITERATIONS;
+  return NUM_ITERATIONS_MAX;
 
 }
 
-__m256i mandel(union four_doubles cre, union four_doubles cim, int is_avx2){
+__m256i mandel(union four_doubles cre, union four_doubles cim, unsigned int is_avx2){
 
   union four_ints res;
 
-  if(1){
+  if(is_avx2){
     //AVX2 instrukce jsou podporovany, rychla cesta
-
     res.vec = vec_mandel(cre.vec, cim.vec);
-
-    return res.vec;
 
   }
   else{
-
     //AVX2 instrukce nejsou podporovany, pomala cesta
     res.arr[0] = scalar_mandel(cre.arr[0], cim.arr[0]);
     res.arr[1] = scalar_mandel(cre.arr[1], cim.arr[1]);
     res.arr[2] = scalar_mandel(cre.arr[2], cim.arr[2]);
     res.arr[3] = scalar_mandel(cre.arr[3], cim.arr[3]);
 
-    return res.vec;
-
   }
+
+  return res.vec;
 
 }
 
-void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY, double zoom, int is_avx2){
+void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY, double zoom, unsigned int is_avx2){
 
-  pixel palette[NUM_ITERATIONS];
+  pixel palette[NUM_ITERATIONS_MAX];
 
-  for(int x = 0; x < NUM_ITERATIONS; x++) {
-    palette[x].r = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 16.0));
-    palette[x].g = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 32.0));
-    palette[x].b = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 64.0));
+  pixel start_color, end_color, diff;
+
+  start_color.r = 193;
+  start_color.g = 30;
+  start_color.b = 56;
+
+  end_color.r = 34;
+  end_color.g = 11;
+  end_color.b = 52;
+
+  diff.r = start_color.r - end_color.r;
+  diff.g = start_color.g - end_color.g;
+  diff.b = start_color.b - end_color.b;
+
+  for(int x = 0; x < NUM_ITERATIONS_MAX; x++) {
+    double range = (double) x / (NUM_ITERATIONS_MAX - 1);
+    palette[x].r = start_color.r + (unsigned char)(diff.r * range);
+    palette[x].g = start_color.g + (unsigned char)(diff.g * range);
+    palette[x].b = start_color.b + (unsigned char)(diff.b * range);
   }
 
   double x_min = (RE_MIN + centerX);
@@ -209,15 +206,14 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
 
       res.vec = mandel(cre, cim, is_avx2);
 
-      for(int ii = 0; ii < 4; ii++){
+      for(size_t ii = 0; ii < 4; ii++){
 
-        double range = (double)res.arr[ii] / NUM_ITERATIONS;
-        int index = 255 - (unsigned char)(range * 255.0);
+        int index = (int)res.arr[ii];
 
-        color[i][j + ii].r = index;
+        color[i][j + ii].r = palette[index].r;
         //color[i][j + ii].r = palette[res.arr[ii]].r;
-        color[i][j + ii].b = index;
-        color[i][j + ii].g = index;
+        color[i][j + ii].b = palette[index].g;
+        color[i][j + ii].g = palette[index].b;
       }
       //printf("%d \n",color[i][j].r);
 
@@ -228,7 +224,7 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
 
 int main() {
 
-  int is_avx2 = is_avx2_supported();
+  unsigned int is_avx2 = is_avx2_supported();
 
   SDL_Init(SDL_INIT_VIDEO);
   SDL_Window * window = SDL_CreateWindow("SDL2 Displaying Image",
