@@ -8,7 +8,7 @@
 
 #define HEIGHT 1080
 #define WIDTH 1920
-#define NUM_ITERATIONS 150
+#define NUM_ITERATIONS 255
 
 #define RE_MIN -2
 #define RE_MAX 1.0
@@ -17,14 +17,15 @@
 #define IM_MAX 1.0
 
 //Function to determine AVX2 support
-static inline int is_avx2_supported(){
+static unsigned int is_avx2_supported(){
 
-  unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
-  const int level = 7;
+  unsigned int eax, ebx, ecx, edx;
 
-  __get_cpuid(level, &eax, &ebx, &ecx, &edx);
+  __get_cpuid(7, &eax, &ebx, &ecx, &edx);
 
-  return (ecx & bit_AVX2) ? 1 : 0;
+  //printf("ebx %d %x\n", ebx, ebx);
+
+  return ((ebx & bit_AVX2) ? 1 : 0);
 
 }
 
@@ -158,18 +159,28 @@ __m256i mandel(union four_doubles cre, union four_doubles cim, int is_avx2){
 
 void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY, double zoom, int is_avx2){
 
-  /*pixel palette[NUM_ITERATIONS];
+  pixel palette[NUM_ITERATIONS];
 
   for(int x = 0; x < NUM_ITERATIONS; x++) {
     palette[x].r = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 16.0));
     palette[x].g = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 32.0));
     palette[x].b = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 64.0));
-  }*/
+  }
 
-  double x_min = (RE_MIN + centerX) * zoom;
-  double x_max = (RE_MAX + centerX) * zoom;
-  double y_min = (IM_MIN + centerY) * zoom;
-  double y_max = (IM_MAX + centerY) * zoom;
+  double x_min = (RE_MIN + centerX);
+  double x_max = (RE_MAX + centerX);
+  double y_min = (IM_MIN + centerY);
+  double y_max = (IM_MAX + centerY);
+
+  double x_zoom = (x_max - x_min) * (zoom - 1) * 0.5;
+  double y_zoom = (y_max - y_min) * (zoom - 1) * 0.5;
+
+  x_min = x_min - x_zoom;
+  x_max = x_max + x_zoom;
+  y_min = y_min - y_zoom;
+  y_max = y_max + y_zoom;
+
+  printf("xmin %lf xmax %lf ymin %lf ymax %lf\n", x_min, x_max, y_min, y_max);
 
   static double arr_re[HEIGHT][WIDTH];
   static double arr_im[HEIGHT][WIDTH];
@@ -178,8 +189,8 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
   for (size_t i = 0; i < HEIGHT; i++){
     for (size_t j = 0; j < WIDTH; j++){
 
-      double y =  zoom * (double)i / HEIGHT;
-      double x =  zoom * (double)j / WIDTH;
+      double y =  (double)i / HEIGHT;
+      double x =  (double)j / WIDTH;
 
       arr_re[i][j] = x_min + x * (x_max - x_min);
       arr_im[i][j] = y_min + y * (y_max - y_min);
@@ -200,6 +211,7 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
 
       for(int ii = 0; ii < 4; ii++){
         color[i][j + ii].r = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
+        //color[i][j + ii].r = palette[res.arr[ii]].r;
         color[i][j + ii].b = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
         color[i][j + ii].g = (unsigned char)((double)res.arr[ii] * 255.0 / NUM_ITERATIONS);
       }
@@ -234,8 +246,8 @@ int main() {
   double centerX = 0;
   double centerY = 0;
 
-  SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
-  int i = 0;
+  /*SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
+  int i = 0;*/
 
   while (!quit)
   {
@@ -254,13 +266,13 @@ int main() {
       update = 0;
     }
 
-    //SDL_WaitEvent(&event);
+    SDL_WaitEvent(&event);
 
-    event.key.keysym.sym = commands[i];
-    i++;
+    //event.key.keysym.sym = commands[i];
+    //i++;
 
-    //switch (event.type){
-    switch (SDL_KEYDOWN){
+    switch (event.type){
+    //switch (SDL_KEYDOWN){
 
       case SDL_QUIT:
         quit = 1;
@@ -272,19 +284,19 @@ int main() {
           quit = 1;
         }
         else if(event.key.keysym.sym == SDLK_UP){
-          centerY = centerY - 0.1 * zoom;
+          centerY = centerY - 0.2 * zoom;
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_DOWN){
-          centerY = centerY + 0.1 * zoom;
+          centerY = centerY + 0.2 * zoom;
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_RIGHT){
-          centerX = centerX + 0.1 * zoom;
+          centerX = centerX + 0.2 * zoom;
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_LEFT){
-          centerX = centerX - 0.1 * zoom;
+          centerX = centerX - 0.2 * zoom;
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_KP_PLUS){
