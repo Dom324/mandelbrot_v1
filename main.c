@@ -9,6 +9,8 @@
 
 #include <SDL.h>
 
+#include <cpuid.h>
+
 #define HEIGHT 1080
 #define WIDTH 1920
 #define NUM_ITERATIONS 150
@@ -18,6 +20,17 @@
 
 #define IM_MIN -1
 #define IM_MAX 1.0
+
+static inline int is_avx2_supported(){
+
+  unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
+  const int level = 7;
+
+  __get_cpuid(level, &eax, &ebx, &ecx, &edx);
+
+  return (ecx & bit_AVX2) ? 1 : 0;
+
+}
 
 typedef struct pixel{
 
@@ -46,7 +59,7 @@ union fuckThis{
   double arr[4];
 };
 
-int mandel(double complex c){
+int mandel(double complex c, int is_avx2){
 
   union fuckThis vecC, vecZ;
   vecC.vec = _mm256_set_pd(0.0, 0.0, cimag(c), creal(c));
@@ -63,7 +76,7 @@ int mandel(double complex c){
     //if(cabs(z) > 2) return p;
 
     vecZ.vec = _mm256_add_pd(vecC.vec, mult(vecZ.vec, vecZ.vec));
-    if(sqrt(vecZ.arr[0] * vecZ.arr[1]) > 2.0) return p;
+    if( sqrt(vecZ.arr[0] * vecZ.arr[1]) > 2.0) return p;
 
   }
 
@@ -71,15 +84,15 @@ int mandel(double complex c){
 
 }
 
-void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double zoom){
+void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double zoom, int is_avx2){
 
-  pixel palette[NUM_ITERATIONS];
+  /*pixel palette[NUM_ITERATIONS];
 
   for(int x = 0; x < NUM_ITERATIONS; x++) {
     palette[x].r = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 16.0));
     palette[x].g = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 32.0));
     palette[x].b = (unsigned char)(128.0 + 128 * sin(3.1415 * x / 64.0));
-  }
+  }*/
 
   double x_min = (RE_MIN + creal(center)) * zoom;
   double x_max = (RE_MAX + creal(center)) * zoom;
@@ -99,7 +112,7 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double z
       //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
       //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
 
-      int res = mandel(arr[i][j]);
+      int res = mandel(arr[i][j], is_avx2);
 
       //printf("%.1f%+.1fi cartesian is rho=%f theta=%f polar\n",
       //     creal(arr[i][j]), cimag(arr[i][j]), cabs(arr[i][j]), carg(arr[i][j]));
@@ -115,6 +128,8 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double complex center, double z
 }
 
 int main() {
+
+  int is_avx2 = is_avx2_supported();
 
   SDL_Init(SDL_INIT_VIDEO);
   SDL_Window * window = SDL_CreateWindow("SDL2 Displaying Image",
@@ -144,7 +159,7 @@ int main() {
     if(update){
       static pixel color[HEIGHT][WIDTH];
 
-      calculate_frame(color, center, zoom);
+      calculate_frame(color, center, zoom, is_avx2);
 
       SDL_ConvertPixels(WIDTH, HEIGHT, SDL_PIXELFORMAT_RGB24, color, WIDTH * 3, SDL_PIXELFORMAT_RGBA32, image->pixels, image->pitch);
       texture = SDL_CreateTextureFromSurface(renderer, image);
