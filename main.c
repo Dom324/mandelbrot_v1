@@ -8,7 +8,7 @@
 
 #define HEIGHT 1080
 #define WIDTH 1920
-#define NUM_ITERATIONS_MAX 120
+#define NUM_ITERATIONS_MAX 180
 
 #define RE_MIN -2
 #define RE_MAX 1.0
@@ -58,8 +58,10 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
   //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
 
   union four_ints res;
-  res.vec = _mm256_set_epi64x(0.0, 0.0, 0.0, 0.0);
-  //__m256i iterator = _mm256_set_epi64x(0, 0, 0, 0);
+  res.vec = _mm256_set_epi64x(0, 0, 0, 0);
+  __m256i zero = _mm256_set_epi64x(0, 0, 0, 0);
+  __m256i iterator = _mm256_set_epi64x(0, 0, 0, 0);
+  __m256i one = _mm256_set_epi64x(1, 1, 1, 1);
 
   __m256d Zre2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   __m256d Zim2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
@@ -67,6 +69,8 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
   __m256d two = _mm256_set_pd(2.0, 2.0, 2.0, 2.0);
 
   for(int p = 1; p <= NUM_ITERATIONS_MAX; p++){
+
+    iterator = _mm256_add_epi64(iterator, one);
 
     __m256d twoX = _mm256_add_pd(Zre.vec, Zre.vec);
     Zim.vec = _mm256_mul_pd(Zim.vec, twoX);
@@ -84,12 +88,17 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
     union four_ints mask;
     mask.vec = (__m256i)_mm256_cmp_pd(abs, two, _CMP_LT_OQ);
 
-    res.arr[0] = mask.arr[0] ? p : res.arr[0];
+    //if( ( mask.arr[0] | mask.arr[1] | mask.arr[2] | mask.arr[3] ) == 0 ) break;
+    if(_mm256_testc_si256(zero, mask.vec)) break;
+
+    //printf("%d\n", mask.arr[0]);
+
+    /*res.arr[0] = mask.arr[0] ? p : res.arr[0];
     res.arr[1] = mask.arr[1] ? p : res.arr[1];
     res.arr[2] = mask.arr[2] ? p : res.arr[2];
-    res.arr[3] = mask.arr[3] ? p : res.arr[3];
+    res.arr[3] = mask.arr[3] ? p : res.arr[3];*/
 
-    if( ( mask.arr[0] | mask.arr[1] | mask.arr[2] | mask.arr[3] ) == 0 ) break;
+    res.vec = _mm256_blendv_epi8(res.vec, iterator, mask.vec);
 
   }
 
@@ -145,17 +154,23 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
 
   pixel start_color, end_color, diff;
 
-  start_color.r = 193;
+  /*start_color.r = 193;
   start_color.g = 30;
   start_color.b = 56;
-
   end_color.r = 34;
   end_color.g = 11;
-  end_color.b = 52;
+  end_color.b = 52;*/
 
-  diff.r = start_color.r - end_color.r;
-  diff.g = start_color.g - end_color.g;
-  diff.b = start_color.b - end_color.b;
+  start_color.r = 0;
+  start_color.g = 0;
+  start_color.b = 0;
+  end_color.r = 255;
+  end_color.g = 255;
+  end_color.b = 255;
+
+  diff.r = end_color.r - start_color.r;
+  diff.g = end_color.g - start_color.g;
+  diff.b = end_color.b - start_color.b;
 
   for(int x = 0; x < NUM_ITERATIONS_MAX; x++) {
     double range = (double) x / (NUM_ITERATIONS_MAX - 1);
@@ -210,10 +225,16 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
 
         int index = (int)res.arr[ii];
 
-        color[i][j + ii].r = palette[index].r;
-        //color[i][j + ii].r = palette[res.arr[ii]].r;
-        color[i][j + ii].b = palette[index].g;
-        color[i][j + ii].g = palette[index].b;
+        if(index == 0){
+          color[i][j + ii].r = 0;
+          color[i][j + ii].b = 0;
+          color[i][j + ii].g = 0;
+        }
+        else{
+          color[i][j + ii].r = palette[index].r;
+          color[i][j + ii].b = palette[index].g;
+          color[i][j + ii].g = palette[index].b;
+        }
       }
       //printf("%d \n",color[i][j].r);
 
@@ -245,15 +266,15 @@ int main() {
   double zoom = 1.0;
   double centerX = 0;
   double centerY = 0;
+  static pixel color[HEIGHT][WIDTH];
 
-  /*SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
-  int i = 0;*/
+  SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
+  int i = 0;
 
   while (!quit)
   {
 
     if(update){
-      static pixel color[HEIGHT][WIDTH];
 
       calculate_frame(color, centerX, centerY, zoom, is_avx2);
 
@@ -266,13 +287,14 @@ int main() {
       update = 0;
     }
 
-    SDL_WaitEvent(&event);
+    //SDL_WaitEvent(&event);
+    SDL_PollEvent(&event);
 
-    //event.key.keysym.sym = commands[i];
-    //i++;
+    event.key.keysym.sym = commands[i];
+    i++;
 
-    switch (event.type){
-    //switch (SDL_KEYDOWN){
+    //switch (event.type){
+    switch (SDL_KEYDOWN){
 
       case SDL_QUIT:
         quit = 1;
