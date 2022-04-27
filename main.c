@@ -50,46 +50,47 @@ union four_ints{
   long long arr[4];
 };
 
-__m256i vec_mandel(__m256d cre, __m256d cim){
+__m256i vec_mandel(__m256d cre1, __m256d cim1){
 
-  union four_doubles Zre, Zim;
-  Zre.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
-  Zim.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+  union four_doubles Zre1, Zim1;
+  Zre1.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+  Zim1.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
 
-  union four_ints res;
-  res.vec = _mm256_set_epi64x(0, 0, 0, 0);
-  __m256i zero = _mm256_set_epi64x(0, 0, 0, 0);
+  union four_ints res1, res2;
+  res1.vec = _mm256_set_epi64x(0, 0, 0, 0);
+  //res2.vec = _mm256_set_epi64x(0, 0, 0, 0);
+
+  const __m256i zero = _mm256_set_epi64x(0, 0, 0, 0);
+  const __m256i one = _mm256_set_epi64x(1, 1, 1, 1);
+  const __m256d two = _mm256_set_pd(2.0, 2.0, 2.0, 2.0);
   __m256i iterator = _mm256_set_epi64x(0, 0, 0, 0);
-  __m256i one = _mm256_set_epi64x(1, 1, 1, 1);
 
-  __m256d Zre2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
-  __m256d Zim2 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
-
-  __m256d two = _mm256_set_pd(2.0, 2.0, 2.0, 2.0);
+  __m256d Zre_square_1 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+  __m256d Zim_square_1 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
 
   for(int p = 1; p <= NUM_ITERATIONS_MAX; p++){
 
     iterator = _mm256_add_epi64(iterator, one);
 
-    __m256d twoX = _mm256_add_pd(Zre.vec, Zre.vec);
-    Zim.vec = _mm256_mul_pd(Zim.vec, twoX);
-    Zim.vec = _mm256_add_pd(Zim.vec, cim);
+    __m256d twoRe_1 = _mm256_add_pd(Zre1.vec, Zre1.vec);
+    Zim1.vec = _mm256_mul_pd(Zim1.vec, twoRe_1);
+    Zim1.vec = _mm256_add_pd(Zim1.vec, cim1);
 
-    Zre.vec = _mm256_sub_pd(Zre2, Zim2);
-    Zre.vec = _mm256_add_pd(Zre.vec, cre);
+    Zre1.vec = _mm256_sub_pd(Zre_square_1, Zim_square_1);
+    Zre1.vec = _mm256_add_pd(Zre1.vec, cre1);
 
-    Zre2 = _mm256_mul_pd(Zre.vec, Zre.vec);
-    Zim2 = _mm256_mul_pd(Zim.vec, Zim.vec);
+    Zre_square_1 = _mm256_mul_pd(Zre1.vec, Zre1.vec);
+    Zim_square_1 = _mm256_mul_pd(Zim1.vec, Zim1.vec);
 
-    __m256d abs = _mm256_add_pd(Zre2, Zim2);
-    abs = _mm256_sqrt_pd(abs);
+    __m256d abs1 = _mm256_add_pd(Zre_square_1, Zim_square_1);
+    abs1 = _mm256_sqrt_pd(abs1);
 
-    union four_ints mask;
-    mask.vec = (__m256i)_mm256_cmp_pd(abs, two, _CMP_LT_OQ);
+    union four_ints mask1;
+    mask1.vec = (__m256i)_mm256_cmp_pd(abs1, two, _CMP_LT_OQ);
 
     //if( ( mask.arr[0] | mask.arr[1] | mask.arr[2] | mask.arr[3] ) == 0 ) break;
-    if(_mm256_testc_si256(zero, mask.vec)) break;
+    if(_mm256_testc_si256(zero, mask1.vec)) break;
 
     //printf("%d\n", mask.arr[0]);
 
@@ -98,11 +99,11 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
     res.arr[2] = mask.arr[2] ? p : res.arr[2];
     res.arr[3] = mask.arr[3] ? p : res.arr[3];*/
 
-    res.vec = _mm256_blendv_epi8(res.vec, iterator, mask.vec);
+    res1.vec = _mm256_blendv_epi8(res1.vec, iterator, mask1.vec);
 
   }
 
-  return res.vec;
+  return res1.vec;
 
 }
 
