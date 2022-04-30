@@ -3,6 +3,32 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 
+//funkce na vyber renderovaciho modu
+//funkce pocita 4 pixely najednou
+struct _4i_arr mandel(struct _4d_arr cre, struct _4d_arr cim, unsigned int avx2){
+
+  struct _4i_arr res;
+
+  if(avx2){
+    //AVX2 instrukce jsou podporovany, vektorova (rychla) cesta
+    //funkce "vec_mandel" se vola jednou a pocita 4 pixely najednou
+    res = vec_mandel(cre, cim);
+
+  }
+  else{
+    //AVX2 instrukce nejsou podporovany, skalarni (pomala) cesta
+    //funkce "scalar_mandel" se musi volat 4x, pro kazdy pixel jednou
+    res.arr[0] = scalar_mandel(cre.arr[0], cim.arr[0]);
+    res.arr[1] = scalar_mandel(cre.arr[1], cim.arr[1]);
+    res.arr[2] = scalar_mandel(cre.arr[2], cim.arr[2]);
+    res.arr[3] = scalar_mandel(cre.arr[3], cim.arr[3]);
+
+  }
+
+  return res;
+
+}
+
 // standard scalar version
 int scalar_mandel(double cre, double cim){
 
@@ -29,8 +55,8 @@ __attribute__ ((target ("avx2")))
 struct _4i_arr vec_mandel(struct _4d_arr cre, struct _4d_arr cim){
 
   union four_doubles_avx Zre, Zim, Cre, Cim;
-  Cre.vec = _mm256_set_pd(cre.arr[0], cre.arr[1], cre.arr[2], cre.arr[3]);
-  Cim.vec = _mm256_set_pd(cim.arr[0], cim.arr[1], cim.arr[2], cim.arr[3]);
+  Cre.vec = _mm256_set_pd(cre.arr[3], cre.arr[2], cre.arr[1], cre.arr[0]);
+  Cim.vec = _mm256_set_pd(cim.arr[3], cim.arr[2], cim.arr[1], cim.arr[0]);
   Zre.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   Zim.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
