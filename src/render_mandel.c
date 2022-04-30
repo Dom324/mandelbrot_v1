@@ -3,6 +3,9 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 
+int scalar_mandel(double cre, double cim);
+struct _4i_arr vec_mandel(struct _4d_arr cre, struct _4d_arr cim);
+
 //funkce na vyber renderovaciho modu
 //funkce pocita 4 pixely najednou
 struct _4i_arr mandel(struct _4d_arr cre, struct _4d_arr cim, unsigned int avx2){
