@@ -40,24 +40,35 @@ typedef struct pixel{
 
 } pixel;
 
-union four_doubles{
+struct _4d_arr{
+  double arr[4];
+};
+
+struct _4i_arr{
+  int arr[4];
+};
+
+union four_doubles_avx{
   __m256d vec;
   double arr[4];
 };
 
-union four_ints{
+union four_ints_avx{
   __m256i vec;
   long long arr[4];
 };
 
-__m256i vec_mandel(__m256d cre, __m256d cim){
+__attribute__ ((target ("avx2")))
+struct _4i_arr vec_mandel(struct _4d_arr cre, struct _4d_arr cim){
 
-  union four_doubles Zre, Zim;
+  union four_doubles_avx Zre, Zim, Cre, Cim;
+  Cre.vec = _mm256_set_pd(cre.arr[0], cre.arr[1], cre.arr[2], cre.arr[3]);
+  Cim.vec = _mm256_set_pd(cim.arr[0], cim.arr[1], cim.arr[2], cim.arr[3]);
   Zre.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   Zim.vec = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
   //printf("c in %lf %lfi out %lf %lfi\n", vecC.arr[0], vecC.arr[1], vecC.arr[2], vecC.arr[3]);
 
-  union four_ints res;
+  union four_ints_avx res;
   res.vec = _mm256_set_epi64x(0, 0, 0, 0);
   __m256i zero = _mm256_set_epi64x(0, 0, 0, 0);
   __m256i iterator = _mm256_set_epi64x(0, 0, 0, 0);
@@ -74,10 +85,10 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
 
     __m256d twoX = _mm256_add_pd(Zre.vec, Zre.vec);
     Zim.vec = _mm256_mul_pd(Zim.vec, twoX);
-    Zim.vec = _mm256_add_pd(Zim.vec, cim);
+    Zim.vec = _mm256_add_pd(Zim.vec, Cim.vec);
 
     Zre.vec = _mm256_sub_pd(Zre2, Zim2);
-    Zre.vec = _mm256_add_pd(Zre.vec, cre);
+    Zre.vec = _mm256_add_pd(Zre.vec, Cre.vec);
 
     Zre2 = _mm256_mul_pd(Zre.vec, Zre.vec);
     Zim2 = _mm256_mul_pd(Zim.vec, Zim.vec);
@@ -85,7 +96,7 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
     __m256d abs = _mm256_add_pd(Zre2, Zim2);
     abs = _mm256_sqrt_pd(abs);
 
-    union four_ints mask;
+    union four_ints_avx mask;
     mask.vec = (__m256i)_mm256_cmp_pd(abs, two, _CMP_LT_OQ);
 
     //if( ( mask.arr[0] | mask.arr[1] | mask.arr[2] | mask.arr[3] ) == 0 ) break;
@@ -102,11 +113,18 @@ __m256i vec_mandel(__m256d cre, __m256d cim){
 
   }
 
-  return res.vec;
+  //convert result from array of long long to array of int
+  struct _4i_arr result;
+  result.arr[0] = (int)res.arr[0];
+  result.arr[1] = (int)res.arr[1];
+  result.arr[2] = (int)res.arr[2];
+  result.arr[3] = (int)res.arr[3];
+
+  return result;
 
 }
 
-long long scalar_mandel(double cre, double cim){
+int scalar_mandel(double cre, double cim){
 
   double zre = 0.0;
   double zim = 0.0;
@@ -126,13 +144,13 @@ long long scalar_mandel(double cre, double cim){
 
 }
 
-__m256i mandel(union four_doubles cre, union four_doubles cim, unsigned int is_avx2){
+struct _4i_arr mandel(struct _4d_arr cre, struct _4d_arr cim, unsigned int is_avx2){
 
-  union four_ints res;
+  struct _4i_arr res;
 
   if(is_avx2){
     //AVX2 instrukce jsou podporovany, rychla cesta
-    res.vec = vec_mandel(cre.vec, cim.vec);
+    res = vec_mandel(cre, cim);
 
   }
   else{
@@ -144,7 +162,7 @@ __m256i mandel(union four_doubles cre, union four_doubles cim, unsigned int is_a
 
   }
 
-  return res.vec;
+  return res;
 
 }
 
@@ -214,12 +232,20 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
   for (size_t i = 0; i < HEIGHT; i++){
     for (size_t j = 0; j < WIDTH; j = j + 4){
 
-      union four_ints res;
-      union four_doubles cre, cim;
-      cre.vec = _mm256_set_pd(arr_re[i][j + 3], arr_re[i][j + 2], arr_re[i][j + 1], arr_re[i][j]);
-      cim.vec = _mm256_set_pd(arr_im[i][j + 3], arr_im[i][j + 2], arr_im[i][j + 1], arr_im[i][j]);
+      struct _4i_arr res;
+      struct _4d_arr cre, cim;
 
-      res.vec = mandel(cre, cim, is_avx2);
+      cre.arr[0] = arr_re[i][j + 3];
+      cre.arr[1] = arr_re[i][j + 2];
+      cre.arr[2] = arr_re[i][j + 1];
+      cre.arr[3] = arr_re[i][j + 0];
+
+      cim.arr[0] = arr_im[i][j + 3];
+      cim.arr[1] = arr_im[i][j + 2];
+      cim.arr[2] = arr_im[i][j + 1];
+      cim.arr[3] = arr_im[i][j + 0];
+
+      res = mandel(cre, cim, is_avx2);
 
       for(size_t ii = 0; ii < 4; ii++){
 
@@ -260,7 +286,6 @@ int main() {
   SDL_Surface * image = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 32, SDL_PIXELFORMAT_RGBA32);
   SDL_Texture * texture;
   SDL_Event event;
-  int quit = 0;
   int update = 1;
 
   double zoom = 1.0;
@@ -268,11 +293,12 @@ int main() {
   double centerY = 0;
   static pixel color[HEIGHT][WIDTH];
 
-  SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
-  int i = 0;
+  //const SDL_Keycode commands[] = {SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_KP_PLUS, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_LEFT, SDLK_q};
+  //int i = 0;
 
-  while (!quit)
-  {
+  while (1){
+
+    int quit = 0;
 
     if(update){
 
@@ -290,11 +316,11 @@ int main() {
     //SDL_WaitEvent(&event);
     SDL_PollEvent(&event);
 
-    event.key.keysym.sym = commands[i];
-    i++;
+    /*event.key.keysym.sym = commands[i];
+    i++;*/
 
-    //switch (event.type){
-    switch (SDL_KEYDOWN){
+    switch(event.type){
+    //switch (SDL_KEYDOWN){
 
       case SDL_QUIT:
         quit = 1;
@@ -331,16 +357,21 @@ int main() {
         }
       break;
 
-      }
+    }
+
+    if(quit == 1){
+
+      SDL_DestroyTexture(texture);
+      SDL_FreeSurface(image);
+      SDL_DestroyRenderer(renderer);
+      SDL_DestroyWindow(window);
+
+      SDL_Quit();
+
+      break;
+    }
 
   }
-
-  SDL_DestroyTexture(texture);
-  SDL_FreeSurface(image);
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
-
-  SDL_Quit();
 
   return 0;
 }
