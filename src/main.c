@@ -5,10 +5,12 @@
 
 #include <SDL.h>      //Library to render a window
 
+//nastaveni rozliseni a poctu iteraci
 #define HEIGHT 1080
 #define WIDTH 1920
 #define NUM_ITERATIONS_MAX 150
 
+//pocatecni souradnice
 #define RE_MIN -2
 #define RE_MAX 1.0
 
@@ -25,13 +27,14 @@ void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY,
 int main() {
 
   //check avx2 support
-  unsigned int is_avx2 = is_avx2_supported();
+  const unsigned int is_avx2 = is_avx2_supported();
+  unsigned int enable_avx2 = is_avx2;
 
   //inform user whether his system supports avx2
   if(is_avx2) printf("AVX2 instrukce jsou podporovany, pouziva se vektorova (rychla) cesta\n");
   else printf("AVX2 instrukce NEjsou podporovany, pouziva se skalarni (pomala) cesta\n");
 
-
+  //Inicializovat SDL okno, renderer, texturu
   SDL_Init(SDL_INIT_VIDEO);
   SDL_Window * window = SDL_CreateWindow("SDL2 Displaying Image", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1920, 1080, 0);
 
@@ -44,8 +47,9 @@ int main() {
   SDL_Surface * image = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 32, SDL_PIXELFORMAT_RGBA32);
   SDL_Texture * texture;
   SDL_Event event;
+
+  //promena pro detekovani zda byla zmacknuta klavesa
   int update = 1;
-  unsigned int enable_avx = 1;
 
   //setup position
   double zoom = 1.0;
@@ -66,7 +70,7 @@ int main() {
 
       //volani funkce na vypocet noveho snimku
       //predava se pole "color" (ktere je pouzito i jako vystup), souradnice a zoom obrazovky, a zda se ma pouzit vektorovy mod
-      calculate_frame(color, centerX, centerY, zoom, is_avx2 & enable_avx);
+      calculate_frame(color, centerX, centerY, zoom, is_avx2 & enable_avx2);
 
       SDL_ConvertPixels(WIDTH, HEIGHT, SDL_PIXELFORMAT_RGB24, color, WIDTH * 3, SDL_PIXELFORMAT_RGBA32, image->pixels, image->pitch);
       texture = SDL_CreateTextureFromSurface(renderer, image);
@@ -85,11 +89,11 @@ int main() {
     switch(event.type){
     //switch (SDL_KEYDOWN){
 
-      case SDL_QUIT:
+      case SDL_QUIT:       //pokud uzivatel zavrel okno
         quit = 1;
       break;
 
-      case SDL_KEYDOWN:
+      case SDL_KEYDOWN:   //pokud uzivatel zmacknul klavesu
 
         if(event.key.keysym.sym == SDLK_q){
           quit = 1;
@@ -119,11 +123,11 @@ int main() {
           update = 1;
         }
         else if(event.key.keysym.sym == SDLK_v){
-          if(!is_avx2) printf("Nelze prepnout renderovaci mod, AVX2 instrukce NEjsou podporovany, pouziva se skalarni (pomala) cesta\n");
+          if(!is_avx2) printf("Nelze prepnout renderovaci mod, AVX2 instrukce NEjsou podporovany, pouziva se stale skalarni (pomala) cesta\n");
           else{
-            enable_avx = !enable_avx;
+            enable_avx2 = !enable_avx2;
             update = 1;
-            if(enable_avx) printf("Renderovaci mod prepnut na vektorovy (rychly)\n");
+            if(enable_avx2) printf("Renderovaci mod prepnut na vektorovy (rychly)\n");
             else printf("Renderovaci mod prepnut na skalarni (pomaly)\n");
           }
         }
