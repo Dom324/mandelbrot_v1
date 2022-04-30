@@ -6,9 +6,14 @@
 #include <SDL.h>      //Library to render a window
 #include <cpuid.h>    //Identify AVX2 support
 
+#include <emmintrin.h>
+#include <immintrin.h>
+
+#include "structs.c"    //Include source file with structs
+
 #define HEIGHT 1080
 #define WIDTH 1920
-#define NUM_ITERATIONS_MAX 180
+#define NUM_ITERATIONS_MAX 150
 
 #define RE_MIN -2
 #define RE_MAX 1.0
@@ -26,37 +31,11 @@ static unsigned int is_avx2_supported(){
 
   asm volatile(
     "cpuid" : "=a" (regs[0]), "=b" (regs[1]), "=c" (regs[2]), "=d" (regs[3]) : "a" (7), "c" (0)
-     );
+  );
 
   return ((regs[1] & bit_AVX2) ? 1 : 0);
 
 }
-
-typedef struct pixel{
-
-  unsigned char r;
-  unsigned char g;
-  unsigned char b;
-
-} pixel;
-
-struct _4d_arr{
-  double arr[4];
-};
-
-struct _4i_arr{
-  int arr[4];
-};
-
-union four_doubles_avx{
-  __m256d vec;
-  double arr[4];
-};
-
-union four_ints_avx{
-  __m256i vec;
-  long long arr[4];
-};
 
 __attribute__ ((target ("avx2")))
 struct _4i_arr vec_mandel(struct _4d_arr cre, struct _4d_arr cim){
