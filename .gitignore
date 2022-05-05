@@ -53,3 +53,7 @@ dkms.conf
 
 .out
 .png
+
+# Perf files
+perf.data
+perf.data.old
