@@ -1,3 +1,7 @@
+#pragma once
+
+#include <emmintrin.h>
+#include <immintrin.h>
 
 typedef struct pixel{
 

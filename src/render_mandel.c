@@ -1,7 +1,12 @@
 
+#include <math.h>
+
 // include headers with vector instructions
 #include <emmintrin.h>
 #include <immintrin.h>
+
+#include "structs.h"
+#include "config.h"
 
 int scalar_mandel(double cre, double cim);
 struct _4i_arr vec_mandel(struct _4d_arr cre, struct _4d_arr cim);

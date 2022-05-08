@@ -1,25 +1,14 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 
 #include <SDL.h>      //Library to render a window
 
-//nastaveni rozliseni a poctu iteraci
-#define HEIGHT 1080
-#define WIDTH 1920
-#define NUM_ITERATIONS_MAX 150
+#include "config.h"           //Include header file with defines
+#include "structs.h"          //Include header file with structs
+#include "detect_avx2.h"      //Include header file with function used to detect avx2 support
 
-//pocatecni souradnice
-#define RE_MIN -2
-#define RE_MAX 1.0
-
-#define IM_MIN -1
-#define IM_MAX 1.0
-
-#include "structs.c"          //Include source file with structs
 #include "render_mandel.c"    //Include source file with render functions
-#include "detect_avx2.c"      //Include source file with function used to detect avx2 support
 
 struct _4i_arr mandel(struct _4d_arr cre, struct _4d_arr cim, unsigned int avx2);
 void calculate_frame(pixel color[HEIGHT][WIDTH], double centerX, double centerY, double zoom, unsigned int avx2);
