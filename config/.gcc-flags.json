@@ -1,7 +1,7 @@
 {
   "execPath": "/usr/bin/gcc",
-  "gccDefaultCFlags": "-Wall -Wextra -fanalyzer -fsyntax-only -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wdouble-promotion -Wformat=2 -Wunused-variable",
-  "gccDefaultCppFlags": "-Wall -std=c++11 -Wextra -fanalyzer -fsyntax-only -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wdouble-promotion -Wformat=2 -Wunused-variable",
+  "gccDefaultCFlags": "-c -Wall -Wextra -fanalyzer -Wshadow -pedantic -Wcast-align -Wunused -Wpedantic -Wconversion -Wsign-conversion -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wdouble-promotion -Wformat=2 -Wunused-variable",
+  "gccDefaultCppFlags": "-Wall -std=c++11 -Wextra -fanalyzer -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wdouble-promotion -Wformat=2 -Wunused-variable",
   "gccIncludePaths": ".,./include,./path,/usr/include/SDL2",
   "gccSuppressWarnings": false
 }
